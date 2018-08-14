@@ -31,15 +31,13 @@ import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 	
 	
 	/**
-	 * This is a custom step definition that concatentates two
-	 * user-defined columns together using a user-defined delimiter
-	 * into a new column inserted before the other input columns.
+	 * This is a custom step definition that used for executing workflow
 	 */
 	public class ExecuteWorkflow extends StepConfiguration {
 	
 		public ExecuteWorkflow() {
 			// Basic step information
-			setStepDefinitionName("Custom - Execute Workflow");
+			setStepDefinitionName("Execute Workflow");
 			setStepDefinitionDescription("Executing a workflow");
 			setStepDefinitionIcon("ALPHA_NUMERIC");
 	

@@ -78,6 +78,8 @@ public class PrepareToImport extends StepConfiguration {
 		public long execute() throws SDKException {
 			log(getStepDefinitionName() + " - execute output...");
 			try {
+				// Still using hard code on path
+				//TODO: Recommend to parameterized this path reference
 				boolean test = Files.exists(Paths.get("C:\\\\ApertureDataStudio\\\\data\\\\export\\\\testfounding.xlsx"), LinkOption.NOFOLLOW_LINKS);
 				log("wait for the file ... ");
 				int attempt= 1;

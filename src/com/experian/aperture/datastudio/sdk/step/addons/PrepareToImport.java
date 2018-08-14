@@ -29,9 +29,7 @@ import com.experian.aperture.datastudio.sdk.step.StepProperty;
 import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 
 /**
- * This is a custom step definition that concatentates two
- * user-defined columns together using a user-defined delimiter
- * into a new column inserted before the other input columns.
+ * 
  */
 public class PrepareToImport extends StepConfiguration {
 

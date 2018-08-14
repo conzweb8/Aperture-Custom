@@ -24,7 +24,7 @@ public class CountIf extends StepConfiguration{
 	public CountIf() {
 		log("Countif Version : "+VERSION);
 		setStepDefinitionName("Count If");
-		setStepDefinitionDescription("Performing Count based on terms");
+		setStepDefinitionDescription("Performing Count based on duplicate string");
 		setStepDefinitionIcon("ROWS");
 
 		StepProperty arg1 = new StepProperty()

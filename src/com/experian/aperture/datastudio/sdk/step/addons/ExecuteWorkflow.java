@@ -86,7 +86,7 @@ import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 							"     \"end_time_type\": \"DURATION\", \n" + 
 							"     \"reschedule_interval\": 0, \n" + 
 							"     \"reschedule_limit\": 0, \n" + 
-							"     \"start_time\": \"2018-02-23T02:50:10.323Z\"  \n" + 
+							"     \"start_time\": \"2018-02-23T02:30:10.323Z\"  \n" + 
 							"   }, \n" + 
 							"   \"use_export_steps\": true  \n" + 
 							" }";

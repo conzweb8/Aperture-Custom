@@ -8,6 +8,8 @@ import java.net.URL;
 import java.util.Arrays;
 import java.util.List;
 
+import org.json.JSONObject;
+
 import com.experian.aperture.datastudio.sdk.exception.SDKException;
 import com.experian.aperture.datastudio.sdk.step.StepConfiguration;
 import com.experian.aperture.datastudio.sdk.step.StepOutput;
@@ -17,22 +19,26 @@ import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 
 /**
  * This is a custom step definition that triggers a workflow
+ * Modified By: Constantin
+ * 
+ * Limitation:
+ * - Workflow name must not contain whitespace or any special characters
  */
 public class ExecuteWorkflow extends StepConfiguration {
 	public static String VERSION = "0.0.3";
-	
+
 	public ExecuteWorkflow() {
 		// Basic step information
 		log("Workflow Execution Version : "+VERSION);
-		setStepDefinitionName("Execute Workflow ");
+		setStepDefinitionName("CB Execute Workflow ");
 		setStepDefinitionDescription("Executing a workflow");
 		setStepDefinitionIcon("SHARE");
 
 		StepProperty arg1 = new StepProperty()
 				.ofType(StepPropertyType.STRING)
-				.withStatusIndicator(sp -> () -> sp.allowedValuesProvider != null)
+				//.withStatusIndicator(sp -> () -> sp.allowedValuesProvider != null)
 				.withIconTypeSupplier(sp -> () -> sp.getValue() == null ? "ERROR" : "OK")
-				.withArgTextSupplier(sp -> () -> (sp.getValue() == null || sp.getValue().toString().isEmpty()) ? "Input Value" : sp.getValue().toString())
+				.withArgTextSupplier(sp -> () -> (sp.getValue() == null || sp.getValue().toString().isEmpty()) ? "Workflow name" : sp.getValue().toString())
 				.havingInputNode(() -> "input0")
 				.havingOutputNode(() -> "output0")	
 				.validateAndReturn();
@@ -57,7 +63,8 @@ public class ExecuteWorkflow extends StepConfiguration {
 
 	private class ExecuteWorkflowOutput extends StepOutput {
 		String messages = "";
-		
+		String token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIml2IjpbNzMsMzEsMTg2LDEwNywxNDgsMjU1LDM4LDU3LDY5LDMyLDIwNCwxNjEsMjU1LDYwLDYzLDEzOV19.eyJzdWIiOiJhZG1pbmlzdHJhdG9yIiwic3R0IjoiUkVTVCIsInRrbiI6IlJFU1QiLCJpc3MiOiIwMC0wNS05QS0zQy03QS0wMCIsImV4cCI6MTUzNDM0OTQ4MDMyNywiaWF0IjoxNTM0MzA2MjgwMzI3fQ==.aGEoFM2M4geNV5MkYzwnFd54YmpikyBZ6eA1xv6VDXs=";
+
 		@Override
 		public String getName() {
 			return "Execute Workflow Output";
@@ -66,8 +73,23 @@ public class ExecuteWorkflow extends StepConfiguration {
 		@Override
 		public long execute() throws SDKException {
 			log(getStepDefinitionName() + " - execute output...");
-			String workflowName = (String) getStepProperties().get(0).getValue();
-			
+			String workflowName = getArgument(0);
+			try {
+				JSONObject otfToken = new JSONObject(getOnTheFlyAuthenticationToken());
+
+				log("Workflow Name: " + workflowName);
+				log("Authentication otf : " + otfToken.toString());
+
+				if (otfToken != null && otfToken.length() > 0) {
+					token = otfToken.getString("authentication_token");
+					log("Use otf token.");
+				}
+			}
+			catch (Exception ex) {
+				ex.printStackTrace();
+				logError("Error while parsing JSON authentication value");
+			}
+
 			try {
 				String urlParameters = "{ \n" + 
 						"   \"scheduling\": { \n" + 
@@ -86,10 +108,14 @@ public class ExecuteWorkflow extends StepConfiguration {
 				con.setRequestMethod("POST");
 				con.setRequestProperty("user-Agent", "Mozilla/5.0");
 				con.setRequestProperty("Accept-Language", "en-US,en;q=0.5");
-				con.setRequestProperty("Authorization", "Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIml2IjpbMzYsOTYsNjMsMTQwLDI1NSwxNjcsNTMsNjAsNjIsMTY2LDIwMSwxNDIsMTY5LDE0MywyMjcsMzNdfQ==.eyJzdWIiOiJhZG1pbmlzdHJhdG9yIiwic3R0IjoiUkVTVCIsInRrbiI6IlJFU1QiLCJpc3MiOiIwMC0wNS05QS0zQy03QS0wMCIsImV4cCI6MTUzNDI4MDIyNjI5OSwiaWF0IjoxNTM0MjM3MDI2Mjk5fQ==.xsBlrCAE3f2UCx/vPVEV6unbj52EIxsccpXD+hghBWc=");
+				con.setRequestProperty("Authorization", "Bearer " + token);
 				con.setRequestProperty("Accept", "application/json");
 				con.setRequestProperty("Content-Type", "application/json");
 				con.setDoOutput(true);
+
+				log ("Token used : \nBearer " + token);
+				log (con.getRequestProperty("Authorization"));
+
 				DataOutputStream wr = new DataOutputStream(con.getOutputStream());
 				wr.writeBytes(urlParameters);
 				wr.flush();
@@ -112,14 +138,15 @@ public class ExecuteWorkflow extends StepConfiguration {
 				log(messages);
 			}
 			catch (Exception ex) {
+				ex.printStackTrace();
 				messages = ex.getMessage();
-				logError("ERROR EXECUTE WORKFLOW" + ex.getLocalizedMessage());
+				logError("EXECUTE WORKFLOW FAILED ! " + ex.getLocalizedMessage());
 				logError("Caused by " + ex.getCause().getMessage()+"("+ex.getCause().getLocalizedMessage()+")");
 			}
 			//Original abstract structure
 			return 1;
 		}
-		
+
 		@Override
 		public void initialise() throws SDKException {
 			// clear columns so they are not saved, resulting in undefined columns
@@ -131,6 +158,44 @@ public class ExecuteWorkflow extends StepConfiguration {
 		@Override
 		public Object getValueAt(long arg0, int arg1) throws SDKException {
 			return messages;
+		}
+
+		private String getOnTheFlyAuthenticationToken () throws SDKException {
+			StringBuffer response = new StringBuffer();
+
+			try {
+				String urlParameters = "{ \n" + 
+						"   \"password\": \"P@ssw0rd\", \n" + 
+						"   \"username\": \"administrator\" \n" + 
+						" }";
+				URL obj = new URL("http://localhost:7701/api/v1/login");
+				HttpURLConnection con = (HttpURLConnection) obj.openConnection();
+				con.setRequestMethod("POST");
+				con.setRequestProperty("user-Agent", "Mozilla/5.0");
+				con.setRequestProperty("Accept", "*/*");
+				con.setRequestProperty("Content-Type", "application/json");
+				con.setDoOutput(true);
+				DataOutputStream wr = new DataOutputStream(con.getOutputStream());
+				wr.writeBytes(urlParameters);
+				wr.flush();
+				wr.close();
+
+				BufferedReader in = new BufferedReader(
+						new InputStreamReader(con.getInputStream()));
+				String inputLine;
+
+				while ((inputLine = in.readLine()) != null) {
+					response.append(inputLine);
+				}
+				in.close();
+
+			}
+			catch (Exception ex) {
+				logError("ERROR EXECUTE WORKFLOW" + ex.getLocalizedMessage());
+				logError("Caused by " + ex.getCause().getMessage()+"("+ex.getCause().getLocalizedMessage()+")");
+			}		
+
+			return response.toString();
 		}
 	}
 }

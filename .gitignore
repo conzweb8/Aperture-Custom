@@ -25,3 +25,11 @@ Thumbs.db
 *.class
 .DS_Store
 *.class
+.DS_Store
+.idea/libraries/customapp.xml
+.idea/libraries/lib.xml
+.idea/misc.xml
+.idea/modules.xml
+.idea/vcs.xml
+.idea/workspace.xml
+Aperture Custom.iml

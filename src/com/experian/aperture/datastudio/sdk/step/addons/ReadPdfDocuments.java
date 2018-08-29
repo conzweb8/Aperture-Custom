@@ -17,11 +17,11 @@ import com.experian.aperture.datastudio.sdk.step.StepProperty;
 import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 
 public class ReadPdfDocuments extends StepConfiguration {
-	public static String VERSION = "0.3";
+	public static String VERSION = "0.5";
 
 	public ReadPdfDocuments() {
 		log("ReadPdfDocuments Version : "+VERSION);
-		setStepDefinitionName("Read PDF");
+		setStepDefinitionName("CB Read PDF");
 		setStepDefinitionDescription("Parsing PDF Files");
 		setStepDefinitionIcon("ROWS");
 
@@ -32,7 +32,7 @@ public class ReadPdfDocuments extends StepConfiguration {
 				.withArgTextSupplier(sp -> () -> sp.getValue().toString())
 				//.havingInputNode(() -> "input0")
 				.havingOutputNode(() -> "output0")
-				.withInitialValue("C:\\Working Stuff\\Client\\BRI Finance\\sample.pdf")
+				.withInitialValue("C:\\sample.pdf")
 				.validateAndReturn();
 
 		setStepProperties(Arrays.asList(arg1));
@@ -69,22 +69,6 @@ public class ReadPdfDocuments extends StepConfiguration {
 
 		@Override
 		public void initialise() throws SDKException {
-			try {
-				String filePath = getStepProperties().get(0).getValue().toString();
-				if(filePath == null || filePath.isEmpty())
-					filePath = "C:\\Working Stuff\\Client\\BRI Finance\\sample.pdf";
-				
-				log("Try to open " + filePath);
-				document = PDDocument.load(new File(filePath),"brif");
-				stripper = new MyPDFTextParser();
-			}
-			catch(Exception ex) {
-				log(ex.getStackTrace().toString());
-				cells = new String[1][1];
-				error = true;
-				errMessages = ex.getMessage();
-			}
-			// clear columns so they are not saved, resulting in undefined columns
 			getColumnManager().clearColumns();
 			getColumnManager().addColumn(this, "Nama", "Auto Generated Nama from PDF");
 
@@ -93,6 +77,23 @@ public class ReadPdfDocuments extends StepConfiguration {
 
 		@Override
 		public long execute() throws SDKException {
+			try {
+				String filePath = getStepProperties().get(0).getValue().toString();
+				if(filePath == null || filePath.isEmpty())
+					filePath = "C:\\sample.pdf";
+				
+				log("Try to open " + filePath);
+				document = PDDocument.load(new File(filePath),"brif");
+				stripper = new MyPDFTextParser();
+			}
+			catch(Exception ex) {
+				log("Get into this error : "+ ex.getStackTrace().toString());
+				cells = new String[1][1];
+				error = true;
+				errMessages = ex.getMessage();
+			}
+			// clear columns so they are not saved, resulting in undefined columns
+			
 			int rowcount = 0;
 			
 			if (error) {
@@ -104,7 +105,7 @@ public class ReadPdfDocuments extends StepConfiguration {
 			try {
 				stripper.writeText(document, dummy);
 			} catch (IOException ex) {
-				log(ex.getStackTrace().toString());
+				log("Execution error : " + ex.getStackTrace().toString());
 				error = true;
 				errMessages = ex.getMessage();
 			}

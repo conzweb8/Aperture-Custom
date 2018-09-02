@@ -17,7 +17,7 @@ import com.experian.aperture.datastudio.sdk.step.StepProperty;
 import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 
 public class ReadPdfDocuments extends StepConfiguration {
-	public static String VERSION = "0.5";
+	public static String VERSION = "0.5X";
 
 	public ReadPdfDocuments() {
 		log("ReadPdfDocuments Version : "+VERSION);

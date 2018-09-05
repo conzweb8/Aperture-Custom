@@ -33,3 +33,4 @@ Thumbs.db
 .idea/vcs.xml
 .idea/workspace.xml
 Aperture Custom.iml
+src/com/experian/aperture/datastudio/sdk/test/Testing2.java

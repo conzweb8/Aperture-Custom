@@ -63,7 +63,7 @@ public class ExecuteWorkflow extends StepConfiguration {
 
 	private class ExecuteWorkflowOutput extends StepOutput {
 		String messages = "";
-		String token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIml2IjpbNzMsMzEsMTg2LDEwNywxNDgsMjU1LDM4LDU3LDY5LDMyLDIwNCwxNjEsMjU1LDYwLDYzLDEzOV19.eyJzdWIiOiJhZG1pbmlzdHJhdG9yIiwic3R0IjoiUkVTVCIsInRrbiI6IlJFU1QiLCJpc3MiOiIwMC0wNS05QS0zQy03QS0wMCIsImV4cCI6MTUzNDM0OTQ4MDMyNywiaWF0IjoxNTM0MzA2MjgwMzI3fQ==.aGEoFM2M4geNV5MkYzwnFd54YmpikyBZ6eA1xv6VDXs=";
+		String token = "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiIsIml2IjpbMjEwLDE0NywyMTUsODIsNjgsMzgsMSwyOCwxNTUsMSwzNiwxNDcsMjE3LDE4MiwyMzEsODFdfQ==.eyJzdWIiOiJhZG1pbmlzdHJhdG9yIiwic3R0IjoiUkVTVCIsInRrbiI6IlJFU1QiLCJpc3MiOiI0Mi0wMS0wQS05NC0wMC0wMyIsImV4cCI6MTUzNjYxOTg4MjY3OCwiaWF0IjoxNTM2NTc2NjgyNjc4fQ==.ANk0zOpbA3UtbEnohNdWr7UlkN8IBuLkTT3p0qEw9Oo=";
 
 		@Override
 		public String getName() {

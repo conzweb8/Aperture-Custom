@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Aperture Custom:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/Aperture_Custom_jar</output-path>
+    <root id="archive" name="Aperture Custom.jar">
+      <element id="module-output" name="Aperture Custom" />
+    </root>
+  </artifact>
+</component>

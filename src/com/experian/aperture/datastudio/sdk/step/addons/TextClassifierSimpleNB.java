@@ -37,7 +37,7 @@ public class TextClassifierSimpleNB extends StepConfiguration{
 	
 	public TextClassifierSimpleNB() {
 		log("TextClassifierSimpleNB Version : "+VERSION);
-		setStepDefinitionName("Text Classify SNB");
+		setStepDefinitionName("CB Text Classify SNB");
 		setStepDefinitionDescription("Classifying text using simple Naives Bayes (SNB)");
 		setStepDefinitionIcon("ROWS");
 

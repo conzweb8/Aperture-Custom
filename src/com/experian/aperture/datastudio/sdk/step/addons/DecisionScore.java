@@ -30,7 +30,7 @@ import com.experian.aperture.datastudio.sdk.step.StepProperty;
 import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 
 public class DecisionScore extends StepConfiguration{
-	public static String VERSION = "0.0.1";
+	public static String VERSION = "0.0.2";
 	//TODO: Create Cache
 	//TODO: More optimize processing... 
 
@@ -70,7 +70,7 @@ public class DecisionScore extends StepConfiguration{
 		static final int BLOCK_SIZE = 1000;
 		static final int THREAD_SIZE = 24;
 
-		Map<String, String> object_response = new HashMap<String, String>();
+		Map<String, DecisionResponse> object_response = new HashMap<String, DecisionResponse>();
 
 		@Override
 		public String getName() {
@@ -91,7 +91,6 @@ public class DecisionScore extends StepConfiguration{
 
 		@Override
 		public long execute() throws SDKException {
-			long lastRowCount = 0L;
 			Long rowCount = Long.valueOf(getInput(0).getRowCount());
 			ExecutorService es = Executors.newFixedThreadPool(THREAD_SIZE);
 
@@ -102,7 +101,6 @@ public class DecisionScore extends StepConfiguration{
 			List<Future> futures = new ArrayList<>();
 			Double progress = 0D;
 			long rowId = 0L;
-			lastRowCount = rowCount;
 			for (rowId = 1L; rowId <= rowCount; rowId++) {
 				try {
 					StringBuffer parameters = new StringBuffer();
@@ -110,16 +108,17 @@ public class DecisionScore extends StepConfiguration{
 					//Initial logic to capture all available column as input parameter for DA
 					String param1 = (String.valueOf(selectedColumn.getValue(rowId)));
 					parameters = parameters.append(param1);
+					
 					String allparam = parameters.toString();
-					futures.add(es.submit(() -> performScoringTest(allparam)));
+					String rowIdStr = String.valueOf(rowId);
+					futures.add(es.submit(() -> performScoringTest(rowIdStr, allparam)));
 				} catch (Exception e) {
 					throw new SDKException(e);
 				}
 
 				if (rowId % BLOCK_SIZE == 0) {
-					lastRowCount = rowId;
 					//log("Future size processed : " + futures.size() + " row id " + rowId);
-					waitForFutures(futures, lastRowCount);
+					waitForFutures(futures);
 					progress = (Long.valueOf(rowId).doubleValue()/rowCount) * 100;
 					//log("Processed: " + progress.intValue() + "%");
 					sendProgress(progress);
@@ -127,7 +126,7 @@ public class DecisionScore extends StepConfiguration{
 			}
 
 			// process the remaining futures
-			waitForFutures(futures, lastRowCount);
+			waitForFutures(futures);
 
 			// close all threads
 			es.shutdown();
@@ -138,13 +137,13 @@ public class DecisionScore extends StepConfiguration{
 			return rowCount;
 		}	
 
-		private String performScoringTest(String parameter) {
+		private DecisionResponse performScoringTest(String rowId, String parameter) {
 			int hitung = 0;
 
 			for (int a=0;a<parameter.length();a++)
 				hitung = hitung + Integer.valueOf(parameter.charAt(a));
 
-			return String.valueOf(hitung);
+			return new DecisionResponse(String.valueOf(rowId), String.valueOf(hitung));
 		}
 
 		/**
@@ -198,10 +197,8 @@ public class DecisionScore extends StepConfiguration{
 			return "Unknown";
 		}
 
-		private void waitForFutures(List<Future> futures, long rowId) throws SDKException {
+		private void waitForFutures(List<Future> futures) throws SDKException {
 			log("Check object to save : " + futures.size());
-			
-			long rowIdHere = 0;
 			
 			for (Future future : futures) {				
 				Object emr = null;
@@ -214,10 +211,9 @@ public class DecisionScore extends StepConfiguration{
 				}
 				if (emr != null && emr instanceof String) {
 					//log("Param  " + rowIdHere + ": " + String.valueOf(emr) + "");
-					object_response.put(String.valueOf(rowIdHere), String.valueOf(emr));
+					object_response.put(((DecisionResponse) emr).getRowID(), (DecisionResponse) emr);
 				}
 				
-				rowIdHere++;
 			}
 			futures.clear();
 		}
@@ -227,11 +223,31 @@ public class DecisionScore extends StepConfiguration{
 			String result = "";
 
 			//String value = countObj.get(currentCellValue).toString();
-			result = object_response.get(String.valueOf(row));
+			result = object_response.get(String.valueOf(row)).getResponseMsg();
 			log("Fungsi GetValueAt... return " + result);
 
 			return result;
 		}
+		
+		private class DecisionResponse {
+			private String rowID;
+			private String responseMsg;
+			
+			public DecisionResponse(String rowID, String responseMsg) {
+				this.rowID = rowID;
+				this.responseMsg = responseMsg;
+			}
+			
+			public String getRowID() {
+				return rowID;
+			}
+
+			private String getResponseMsg() {
+				return responseMsg;
+			}
+
+		}
+		
 	}	
 
 }

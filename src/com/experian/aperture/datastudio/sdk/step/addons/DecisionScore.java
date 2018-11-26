@@ -1,7 +1,11 @@
 package com.experian.aperture.datastudio.sdk.step.addons;
 
+import java.io.BufferedReader;
+import java.io.DataOutputStream;
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
+import java.io.InputStreamReader;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -12,16 +16,6 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
-import org.apache.http.client.HttpClient;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.entity.StringEntity;
-import org.apache.http.impl.client.DefaultHttpClient;
-import org.apache.http.util.EntityUtils;
-import org.json.JSONObject;
-
 import com.experian.aperture.datastudio.sdk.exception.SDKException;
 import com.experian.aperture.datastudio.sdk.step.StepColumn;
 import com.experian.aperture.datastudio.sdk.step.StepConfiguration;
@@ -30,7 +24,7 @@ import com.experian.aperture.datastudio.sdk.step.StepProperty;
 import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 
 public class DecisionScore extends StepConfiguration{
-	public static String VERSION = "0.0.2";
+	public static String VERSION = "0.1";
 	//TODO: Create Cache
 	//TODO: More optimize processing... 
 
@@ -110,8 +104,9 @@ public class DecisionScore extends StepConfiguration{
 					parameters = parameters.append(param1);
 					
 					String allparam = parameters.toString();
-					String rowIdStr = String.valueOf(rowId);
-					futures.add(es.submit(() -> performScoringTest(rowIdStr, allparam)));
+					String rowIdStr = String.valueOf(rowId-1);
+					futures.add(es.submit(() -> performScoring(rowIdStr, allparam)));
+					//futures.add(es.submit(() -> performScoringTest(rowIdStr, allparam)));
 				} catch (Exception e) {
 					throw new SDKException(e);
 				}
@@ -153,52 +148,120 @@ public class DecisionScore extends StepConfiguration{
 		 * @param textString
 		 * @return String
 		 */
-		private String performScoring(String parameter) {
-			HttpClient httpClient = new DefaultHttpClient();
-			HttpPost httpPost = new HttpPost("http://35.192.129.194:5000/classify");
-			// Request parameters and other properties.
+		private DecisionResponse performScoring(String rowId, String parameter) {
+	        HttpURLConnection con;
+	        URL obj;
+	        String messages = "";
+	        
+	        try {
+	            String urlStr = "http://localhost:8092/DAService";
+	            obj = new URL(urlStr);
+	            con = (HttpURLConnection) obj.openConnection();
 
-			try {
-				httpPost.addHeader("content-type", "application/json");
-				StringEntity paramsTxt = new StringEntity("{\"text\":\"" + "" + "\"}") ;
-				httpPost.setEntity(paramsTxt);
-			} catch (UnsupportedEncodingException e) {
-				// writing error to Log
-				log("Error ! perform http post " + e.getMessage());
-				e.printStackTrace();
-			}
-			/*
-			 * Execute the HTTP Request
-			 */
-			try {
-				HttpResponse response = httpClient.execute(httpPost);
-				HttpEntity respEntity = response.getEntity();
+	            String urlBody = "<soap:envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n" + 
+	            		"<soap:body>\r\n" + 
+	            		"<DAXMLDocument xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n" + 
+	            		"<OCONTROL>\r\n" + 
+	            		"<ALIAS>COLE2E</ALIAS>\r\n" + 
+	            		"<SIGNATURE>EXPN</SIGNATURE>\r\n" + 
+	            		"<APPLICATION_ID>111111</APPLICATION_ID>\r\n" + 
+	            		"<DALOGLEVEL>0</DALOGLEVEL>\r\n" + 
+	            		"</OCONTROL>\r\n" + 
+	            		"<INPUT>\r\n" + 
+	            		"<Ba2flag/>\r\n" + 
+	            		"<Badacctflag/>\r\n" + 
+	            		"<Bussunit/>\r\n" + 
+	            		"<Ca>C0</Ca>\r\n" + 
+	            		"<Cam1>C0</Cam1>\r\n" + 
+	            		"<Cam2>C0</Cam2>\r\n" + 
+	            		"<Cam3>C0</Cam3>\r\n" + 
+	            		"<Contractno>0</Contractno>\r\n" + 
+	            		"<Currpalsts/>\r\n" + 
+	            		"<Cy>C0</Cy>\r\n" + 
+	            		"<Cym1>C0</Cym1>\r\n" + 
+	            		"<Cym2>C0</Cym2>\r\n" + 
+	            		"<Cym3>C0</Cym3>\r\n" + 
+	            		"<Grsdp>1000000</Grsdp>\r\n" + 
+	            		"<Instno>14</Instno>\r\n" + 
+	            		"<Isautowo>N</Isautowo>\r\n" + 
+	            		"<Ispelsus>0</Ispelsus>\r\n" + 
+	            		"<Jtp>5</Jtp>\r\n" + 
+	            		"<MobDate>2018-03-10</MobDate>\r\n" + 
+	            		"<Monthinst>1235000</Monthinst>\r\n" + 
+	            		"<Netdp>0</Netdp>\r\n" + 
+	            		"<Objprice>20000000</Objprice>\r\n" + 
+	            		"<Officecode>0</Officecode>\r\n" + 
+	            		"<Pb>L5</Pb>\r\n" + 
+	            		"<Pbm1>L5</Pbm1>\r\n" + 
+	            		"<Pbm2>L5</Pbm2>\r\n" + 
+	            		"<Pbm3>L5</Pbm3>\r\n" + 
+	            		"<Periode>0</Periode>\r\n" + 
+	            		"<Principal>20005000</Principal>\r\n" + 
+	            		"<Prncots>16122976</Prncots>\r\n" + 
+	            		"<Rotype/>\r\n" + 
+	            		"<Sip/>\r\n" + 
+	            		"<Sipgrade>BRONZE</Sipgrade>\r\n" + 
+	            		"<St>AC</St>\r\n" + 
+	            		"<Tgglbyrm1>27</Tgglbyrm1>\r\n" + 
+	            		"<Tgglbyrm2>28</Tgglbyrm2>\r\n" + 
+	            		"<Tgglbyrm3>28</Tgglbyrm3>\r\n" + 
+	            		"<Top>24</Top>\r\n" + 
+	            		"<Tt1>PIM</Tt1>\r\n" + 
+	            		"<Tt2>RC</Tt2>\r\n" + 
+	            		"<Tt3>RC</Tt3>\r\n" + 
+	            		"</INPUT>\r\n" + 
+	            		"<RESULTS>\r\n" + 
+	            		"<Category/>\r\n" + 
+	            		"<InstToTopCat>0</InstToTopCat>\r\n" + 
+	            		"<Mob>0</Mob>\r\n" + 
+	            		"<RiskCategory/>\r\n" + 
+	            		"<Score>0</Score>\r\n" + 
+	            		"<Treatment/>\r\n" + 
+	            		"</RESULTS>\r\n" + 
+	            		"</DAXMLDocument>\r\n" + 
+	            		"</soap:body>\r\n" + 
+	            		"</soap:envelope>";
 
-				if (respEntity != null) {
-					// EntityUtils to get the response content
-					String content =  EntityUtils.toString(respEntity);
-					JSONObject obj = new JSONObject(content);
-					//log("Return : " + obj.getString("result"));
-					return obj.getString("result");
-				}
-			} catch (ClientProtocolException e) {
-				// writing exception to log
-				e.printStackTrace();
-				log("Error ! perform response retrieval" + e.getMessage());
-			} catch (IOException e) {
-				// writing exception to log
-				e.printStackTrace();
-				log("Error ! perform response retrieval" + e.getMessage());
-			} catch (Exception e) {
-				e.printStackTrace();
-				log("Error ! perform response retrieval" + e.getMessage());
-			}
+	            con.setRequestMethod("POST");
+	            con.setRequestProperty("Content-Type", "application/xml");
+	            con.setDoOutput(true);
 
-			return "Unknown";
+	            DataOutputStream wr = new DataOutputStream(con.getOutputStream());
+	            wr.writeBytes(urlBody);
+	            wr.flush();
+	            wr.close();
+
+	            int responseCode = con.getResponseCode();
+
+	            BufferedReader in = new BufferedReader(
+	                    new InputStreamReader(con.getInputStream()));
+	            String inputLine;
+	            StringBuffer response = new StringBuffer();
+
+	            while ((inputLine = in.readLine()) != null) {
+	                response.append(inputLine);
+	            }
+	            in.close();
+
+	            //print result
+	            
+	            messages = " - Response (" + responseCode +") : "+  response.toString();
+	            return new DecisionResponse(String.valueOf(rowId), String.valueOf("TEST"));
+	        }
+	        catch (IOException ex){
+	            ex.printStackTrace();
+
+	        }
+	        catch (Exception ex) {
+	            ex.printStackTrace();
+	            messages = ex.getMessage();
+	        }
+
+			return new DecisionResponse(String.valueOf(rowId), String.valueOf("Unknown"));
 		}
 
 		private void waitForFutures(List<Future> futures) throws SDKException {
-			log("Check object to save : " + futures.size());
+			//log("Check object to save : " + futures.size());
 			
 			for (Future future : futures) {				
 				Object emr = null;
@@ -209,8 +272,8 @@ public class DecisionScore extends StepConfiguration{
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
-				if (emr != null && emr instanceof String) {
-					//log("Param  " + rowIdHere + ": " + String.valueOf(emr) + "");
+				if (emr != null && emr instanceof DecisionResponse) {
+					//log("Param  " + ((DecisionResponse) emr).getRowID() + ": " + String.valueOf(emr) + "");
 					object_response.put(((DecisionResponse) emr).getRowID(), (DecisionResponse) emr);
 				}
 				
@@ -224,7 +287,7 @@ public class DecisionScore extends StepConfiguration{
 
 			//String value = countObj.get(currentCellValue).toString();
 			result = object_response.get(String.valueOf(row)).getResponseMsg();
-			log("Fungsi GetValueAt... return " + result);
+			//log("Fungsi GetValueAt... return " + result);
 
 			return result;
 		}

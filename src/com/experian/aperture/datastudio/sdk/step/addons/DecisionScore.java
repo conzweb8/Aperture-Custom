@@ -11,7 +11,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
@@ -22,7 +21,6 @@ import org.apache.http.entity.StringEntity;
 import org.apache.http.impl.client.DefaultHttpClient;
 import org.apache.http.util.EntityUtils;
 import org.json.JSONObject;
-import org.omg.CORBA.INITIALIZE;
 
 import com.experian.aperture.datastudio.sdk.exception.SDKException;
 import com.experian.aperture.datastudio.sdk.step.StepColumn;
@@ -35,7 +33,7 @@ public class DecisionScore extends StepConfiguration{
 	public static String VERSION = "0.0.1";
 	//TODO: Create Cache
 	//TODO: More optimize processing... 
-	
+
 	public DecisionScore() {
 		log("Decision Score Version : "+VERSION);
 		setStepDefinitionName("HfB Decision Score");
@@ -71,26 +69,26 @@ public class DecisionScore extends StepConfiguration{
 	private class MyStepOutput extends StepOutput {
 		static final int BLOCK_SIZE = 1000;
 		static final int THREAD_SIZE = 24;
-		
-		Map<String, String> result = new HashMap<String, String>();
+
+		Map<String, String> object_response = new HashMap<String, String>();
 
 		@Override
 		public String getName() {
 			return "Decision Score";
 		}
-		
+
 		@Override
 		public void initialise() throws SDKException {
 			// clear columns so they are not saved, resulting in undefined columns
 			getColumnManager().clearColumns();
 			// initialise the columns with the first input's columns
 			getColumnManager().setColumnsFromInput(getInput(0));
-			
+
 			//TODO: Check on column name output - for the result after calling decision engine
 			getColumnManager().addColumnAt(this, "Score", "", getColumnManager().getColumnCount());
 
 		}
-		
+
 		@Override
 		public long execute() throws SDKException {
 			long lastRowCount = 0L;
@@ -103,24 +101,25 @@ public class DecisionScore extends StepConfiguration{
 			// queue up to 1000 threads, for processing BLOCK_SIZE times simultaneously
 			List<Future> futures = new ArrayList<>();
 			Double progress = 0D;
-			
-			for (long rowId = 0L; rowId <= rowCount; rowId++) {
+			long rowId = 0L;
+			lastRowCount = rowCount;
+			for (rowId = 1L; rowId <= rowCount; rowId++) {
 				try {
 					StringBuffer parameters = new StringBuffer();
 					//TODO: Capture all parameter 
 					//Initial logic to capture all available column as input parameter for DA
 					String param1 = (String.valueOf(selectedColumn.getValue(rowId)));
-					log("Param 1 : " + param1 + "...");
 					parameters = parameters.append(param1);
 					String allparam = parameters.toString();
-					futures.add(es.submit(() -> performScoring(allparam)));
+					futures.add(es.submit(() -> performScoringTest(allparam)));
 				} catch (Exception e) {
 					throw new SDKException(e);
 				}
 
 				if (rowId % BLOCK_SIZE == 0) {
+					lastRowCount = rowId;
 					//log("Future size processed : " + futures.size() + " row id " + rowId);
-					waitForFutures(futures);
+					waitForFutures(futures, lastRowCount);
 					progress = (Long.valueOf(rowId).doubleValue()/rowCount) * 100;
 					//log("Processed: " + progress.intValue() + "%");
 					sendProgress(progress);
@@ -128,7 +127,7 @@ public class DecisionScore extends StepConfiguration{
 			}
 
 			// process the remaining futures
-			waitForFutures(futures);
+			waitForFutures(futures, lastRowCount);
 
 			// close all threads
 			es.shutdown();
@@ -137,7 +136,16 @@ public class DecisionScore extends StepConfiguration{
 			//log("Processed: " + 100 + "%");
 			sendProgress(progress);
 			return rowCount;
-		}		
+		}	
+
+		private String performScoringTest(String parameter) {
+			int hitung = 0;
+
+			for (int a=0;a<parameter.length();a++)
+				hitung = hitung + Integer.valueOf(parameter.charAt(a));
+
+			return String.valueOf(hitung);
+		}
 
 		/**
 		 * Implement your call into your slow Rest (or other) API here.
@@ -186,27 +194,30 @@ public class DecisionScore extends StepConfiguration{
 				e.printStackTrace();
 				log("Error ! perform response retrieval" + e.getMessage());
 			}
-			
+
 			return "Unknown";
 		}
 
-		private void waitForFutures(List<Future> futures) throws SDKException {
+		private void waitForFutures(List<Future> futures, long rowId) throws SDKException {
 			log("Check object to save : " + futures.size());
-
+			
+			long rowIdHere = 0;
+			
 			for (Future future : futures) {				
 				Object emr = null;
 				try {
-					emr = future.get(10, TimeUnit.SECONDS);
+					emr = future.get();
 				} catch (InterruptedException | ExecutionException e) {
 					throw new SDKException(e);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
 				if (emr != null && emr instanceof String) {
-					StepColumn selectedColumn = getColumnManager().getColumnByName(getArgument(0));
-					//log("Save it to memory " + textToClassify + " - "+ String.valueOf(emr));
-					result.put("<id>", String.valueOf(emr));
+					//log("Param  " + rowIdHere + ": " + String.valueOf(emr) + "");
+					object_response.put(String.valueOf(rowIdHere), String.valueOf(emr));
 				}
+				
+				rowIdHere++;
 			}
 			futures.clear();
 		}
@@ -214,43 +225,11 @@ public class DecisionScore extends StepConfiguration{
 		@Override
 		public Object getValueAt(long row, int col) throws SDKException {
 			String result = "";
-			String inputColumn = "";
-			
-			//log("Fungsi GetValueAt...");
-			// get the user-defined column
 
-			String selectedColumnName = getArgument(0);
-			//log("Fungsi GetValueAt... " + selectedColumnName);
-			// get the column object from the first input
-            StepColumn selectedColumn = getColumnManager().getColumnByName(selectedColumnName);
+			//String value = countObj.get(currentCellValue).toString();
+			result = object_response.get(String.valueOf(row));
+			log("Fungsi GetValueAt... return " + result);
 
-            if (selectedColumnName != null && !selectedColumnName.isEmpty()) {
-				try {
-					inputColumn = (String) selectedColumn.getValue(row);
-				} catch (Exception e) {
-					throw new SDKException(e);
-				}
-			}
-			else 
-				return "<Error no input column>";
-			
-			//log("Fungsi GetValueAt... row "+ row +" > " + inputColumn);
-			if (inputColumn != null) {			
-				//String value = countObj.get(currentCellValue).toString();
-				result = this.result.get(String.valueOf(inputColumn));
-				//log("Fungsi GetValueAt... return " + result);
-			} else {
-				// if not found return an empty value. We could alternatively throw an error.
-				logError(getStepDefinitionName() + " - There was an Error doing getValueAt Row: " + row + ", Column: " + col);
-				result = "ERROR";
-			}
-			
-//			if(!isInteractive() && row % 10 == 0) {
-//				Long rowCount = getInput(0).getRowCount();
-//				double progress = (Long.valueOf(row).doubleValue()/rowCount)*100;
-//				sendProgress(progress);
-//			}
-			
 			return result;
 		}
 	}	

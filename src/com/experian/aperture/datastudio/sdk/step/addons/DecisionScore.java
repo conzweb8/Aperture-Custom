@@ -24,7 +24,7 @@ import com.experian.aperture.datastudio.sdk.step.StepProperty;
 import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 
 public class DecisionScore extends StepConfiguration{
-	public static String VERSION = "0.1.1";
+	public static String VERSION = "0.1.2";
 	//TODO: Create Cache
 	//TODO: More optimize processing... 
 
@@ -83,46 +83,56 @@ public class DecisionScore extends StepConfiguration{
 
 		}
 
-		private String constructBodyRequest() {
+		private String constructBodyRequest(long row) {
 			StringBuffer params = new StringBuffer();
 
 			int totalCol = getColumnManager().getColumnCount();
+			try {
+				//Construct O Control
+				params.append("<soap:envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n");
+				params.append("<soap:body>\r\n" );
+				params.append("<DAXMLDocument xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n");
+				params.append("<OCONTROL>\r\n");
+				for (int a=0 ;a<4; a++) {
+					String columnName = getColumnManager().getColumns().get(a).getDisplayName();
+					String columnValue = (String)getColumnManager().getColumnByName(columnName).getValue(row);
+					params.append("<").append(columnName).append(">").append(columnValue).append("</").append(columnName).append(">\r\n");
+				}
+				params.append("</OCONTROL>\r\n");
 
-			//Construct O Control
-			params.append("<soap:envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n");
-			params.append("<soap:body>\r\n" );
-			params.append("<DAXMLDocument xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n");
-			params.append("<OCONTROL>\r\n");
-			for (int a=0 ;a<4; a++) {
-				String columnName = getColumnManager().getColumns().get(a).getDisplayName();
-				params.append("<").append(columnName).append(">").append("VALUE").append("</").append(columnName).append(">\r\n");
+				//Construct Body Input
+				params.append("<INPUT>\r\n");
+				for (int a=4 ;a<totalCol-6; a++) {
+					String columnName = getColumnManager().getColumns().get(a).getDisplayName();
+					String columnValue = (String)getColumnManager().getColumnByName(columnName).getValue(row);
+					params.append("<").append(columnName).append(">").append(columnValue).append("</").append(columnName).append(">\r\n");
+				}
+				params.append("</INPUT>\r\n");
+				
+				//Construct Results dummy
+				params.append("<RESULTS>\r\n");
+				for (int a=totalCol-6 ;a<totalCol; a++) {
+					String columnName = getColumnManager().getColumns().get(a).getDisplayName();
+					String columnValue = (String)getColumnManager().getColumnByName(columnName).getValue(row);
+					params.append("<").append(columnName).append(">").append(columnValue).append("</").append(columnName).append(">\r\n");
+				}			
+				params.append("<Category/>\r\n" + 
+						"<InstToTopCat>0</InstToTopCat>\r\n" + 
+						"<Mob>0</Mob>\r\n" + 
+						"<RiskCategory/>\r\n" + 
+						"<Score>0</Score>\r\n" + 
+						"<Treatment/>\r\n"); 	
+				params.append("</RESULTS>\r\n");
+				
+				//Construct end tag
+				params.append("</DAXMLDocument>\r\n");
+				params.append("</soap:body>\r\n");
+				params.append("</soap:envelope>");
+			} catch (Exception e) {
+				logError(e.getMessage());
 			}
-			params.append("</OCONTROL>\r\n");
-
-			params.append("<INPUT>\r\n");
-			for (int a=4 ;a<totalCol-6; a++) {
-				String columnName = getColumnManager().getColumns().get(a).getDisplayName();
-				params.append("<").append(columnName).append(">").append("VALUE").append("</").append(columnName).append(">\r\n");
-			}
-			params.append("</INPUT>\r\n");
-			params.append("<RESULTS>\r\n");
-			//TODO: Parsing results
-			for (int a=4 ;a<totalCol-6; a++) {
-				String columnName = getColumnManager().getColumns().get(a).getDisplayName();
-				params.append("<").append(columnName).append(">").append("VALUE").append("</").append(columnName).append(">\r\n");
-			}			
-			params.append("<Category/>\r\n" + 
-					"<InstToTopCat>0</InstToTopCat>\r\n" + 
-					"<Mob>0</Mob>\r\n" + 
-					"<RiskCategory/>\r\n" + 
-					"<Score>0</Score>\r\n" + 
-					"<Treatment/>\r\n"); 
 			
-			params.append("</RESULTS>\r\n");
-			params.append("</DAXMLDocument>\r\n");
-			params.append("</soap:body>\r\n");
-			params.append("</soap:envelope>");
-
+			log("string constructed: "+params.toString());
 			return params.toString();
 		}
 
@@ -131,24 +141,14 @@ public class DecisionScore extends StepConfiguration{
 			Long rowCount = Long.valueOf(getInput(0).getRowCount());
 			ExecutorService es = Executors.newFixedThreadPool(THREAD_SIZE);
 
-			String selectedColumnName = getArgument(0);
-			StepColumn selectedColumn = getColumnManager().getColumnByName(selectedColumnName);
-
 			// queue up to 1000 threads, for processing BLOCK_SIZE times simultaneously
 			List<Future> futures = new ArrayList<>();
 			Double progress = 0D;
 			long rowId = 0L;
 			for (rowId = 1L; rowId <= rowCount; rowId++) {
 				try {
-					StringBuffer parameters = new StringBuffer();
-					//TODO: Capture all parameter 
-					//Initial logic to capture all available column as input parameter for DA
-					String param1 = (String.valueOf(selectedColumn.getValue(rowId)));
-					parameters = parameters.append(param1);
-
-					String allparam = parameters.toString();
 					String rowIdStr = String.valueOf(rowId-1);
-					futures.add(es.submit(() -> performScoring(rowIdStr, allparam)));
+					futures.add(es.submit(() -> performScoring(rowIdStr)));
 					//futures.add(es.submit(() -> performScoringTest(rowIdStr, allparam)));
 				} catch (Exception e) {
 					throw new SDKException(e);
@@ -175,13 +175,50 @@ public class DecisionScore extends StepConfiguration{
 			return rowCount;
 		}	
 
-		private DecisionResponse performScoringTest(String rowId, String parameter) {
-			int hitung = 0;
+		private DecisionResponse performScoring(String rowId) {
+			HttpURLConnection con;
+			URL obj;
 
-			for (int a=0;a<parameter.length();a++)
-				hitung = hitung + Integer.valueOf(parameter.charAt(a));
+			try {
+				String urlStr = "http://localhost:8092/DAService";
+				obj = new URL(urlStr);
+				con = (HttpURLConnection) obj.openConnection();
 
-			return new DecisionResponse(String.valueOf(rowId), String.valueOf(hitung));
+				String urlBody = constructBodyRequest(Long.parseLong(rowId));
+
+				con.setRequestMethod("POST");
+				con.setRequestProperty("Content-Type", "application/xml");
+				con.setDoOutput(true);
+
+				DataOutputStream wr = new DataOutputStream(con.getOutputStream());
+				wr.writeBytes(urlBody);
+				wr.flush();
+				wr.close();
+
+				int responseCode = con.getResponseCode();
+
+				BufferedReader in = new BufferedReader(
+						new InputStreamReader(con.getInputStream()));
+				String inputLine;
+				StringBuffer response = new StringBuffer();
+
+				while ((inputLine = in.readLine()) != null) {
+					response.append(inputLine);
+				}
+				in.close();
+				
+				log("Response : " + responseCode + " - message : " + response.toString());
+				return new DecisionResponse(String.valueOf(rowId), String.valueOf("TEST"));
+			}
+			catch (IOException ex){
+				ex.printStackTrace();
+
+			}
+			catch (Exception ex) {
+				ex.printStackTrace();
+			}
+
+			return new DecisionResponse(String.valueOf(rowId), String.valueOf("Unknown"));
 		}
 
 		/**
@@ -194,7 +231,6 @@ public class DecisionScore extends StepConfiguration{
 		private DecisionResponse performScoring(String rowId, String parameter) {
 			HttpURLConnection con;
 			URL obj;
-			String messages = "";
 
 			try {
 				String urlStr = "http://localhost:8092/DAService";
@@ -288,7 +324,6 @@ public class DecisionScore extends StepConfiguration{
 
 				//print result
 
-				messages = " - Response (" + responseCode +") : "+  response.toString();
 				return new DecisionResponse(String.valueOf(rowId), String.valueOf("TEST"));
 			}
 			catch (IOException ex){
@@ -297,7 +332,6 @@ public class DecisionScore extends StepConfiguration{
 			}
 			catch (Exception ex) {
 				ex.printStackTrace();
-				messages = ex.getMessage();
 			}
 
 			return new DecisionResponse(String.valueOf(rowId), String.valueOf("Unknown"));

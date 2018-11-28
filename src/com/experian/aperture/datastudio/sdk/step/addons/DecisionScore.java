@@ -4,10 +4,13 @@ import java.io.BufferedReader;
 import java.io.DataOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,18 +19,27 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.InputSource;
+
 import com.experian.aperture.datastudio.sdk.exception.SDKException;
-import com.experian.aperture.datastudio.sdk.step.StepColumn;
 import com.experian.aperture.datastudio.sdk.step.StepConfiguration;
 import com.experian.aperture.datastudio.sdk.step.StepOutput;
 import com.experian.aperture.datastudio.sdk.step.StepProperty;
 import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
+import com.experian.datatype.DateAndTime;
+
 
 public class DecisionScore extends StepConfiguration{
-	public static String VERSION = "0.1.2";
+	public static String VERSION = "0.1.4";
 	//TODO: Create Cache
 	//TODO: More optimize processing... 
-
 	public DecisionScore() {
 		log("Decision Score Version : "+VERSION);
 		setStepDefinitionName("HfB Decision Score");
@@ -85,6 +97,8 @@ public class DecisionScore extends StepConfiguration{
 
 		private String constructBodyRequest(long row) {
 			StringBuffer params = new StringBuffer();
+			long currCol = 0;
+			String currColumnProcessed = "";
 
 			int totalCol = getColumnManager().getColumnCount();
 			try {
@@ -95,17 +109,42 @@ public class DecisionScore extends StepConfiguration{
 				params.append("<OCONTROL>\r\n");
 				for (int a=0 ;a<4; a++) {
 					String columnName = getColumnManager().getColumns().get(a).getDisplayName();
-					String columnValue = (String)getColumnManager().getColumnByName(columnName).getValue(row);
-					params.append("<").append(columnName).append(">").append(columnValue).append("</").append(columnName).append(">\r\n");
+					currColumnProcessed = columnName;
+					currCol = a;
+					String columnValue = getColumnManager().getColumnByName(columnName).getValue(row).toString();
+					params.append("<").append(columnName.toUpperCase().replace(" ", "_")).append(">").append(columnValue).append("</").append(columnName.toUpperCase().replace(" ", "_")).append(">\r\n");
+					
 				}
 				params.append("</OCONTROL>\r\n");
 
 				//Construct Body Input
 				params.append("<INPUT>\r\n");
-				for (int a=4 ;a<totalCol-6; a++) {
+				for (int a=9 ;a<totalCol-7; a++) {
 					String columnName = getColumnManager().getColumns().get(a).getDisplayName();
-					String columnValue = (String)getColumnManager().getColumnByName(columnName).getValue(row);
-					params.append("<").append(columnName).append(">").append(columnValue).append("</").append(columnName).append(">\r\n");
+					currColumnProcessed = columnName;
+					currCol = a;
+					String columnValueStr = "";
+					Object columnValue = getColumnManager().getColumnByName(columnName).getValue(row);
+					
+					
+					if (columnValue != null && columnValue instanceof DateAndTime) {
+						//If date format
+						DateAndTime dateformatval = (DateAndTime) columnValue;
+						//log("Before : " + dateformatval.toString());
+						
+						Calendar datecalendar = dateformatval.toCalendar();
+						
+						SimpleDateFormat format = new SimpleDateFormat("yyyy-MM-dd");
+						columnValueStr = format.format(datecalendar.getTime());
+						
+						//log("After formatted : " + columnValueStr);
+					}
+					else if (columnValue != null) {
+						//Everything else
+						//log("Object instance : " + columnValue.getClass());
+						columnValueStr = columnValue.toString();
+					}
+					params.append("<").append(columnName).append(">").append(columnValueStr).append("</").append(columnName).append(">\r\n");
 				}
 				params.append("</INPUT>\r\n");
 				
@@ -113,15 +152,12 @@ public class DecisionScore extends StepConfiguration{
 				params.append("<RESULTS>\r\n");
 				for (int a=totalCol-6 ;a<totalCol; a++) {
 					String columnName = getColumnManager().getColumns().get(a).getDisplayName();
-					String columnValue = (String)getColumnManager().getColumnByName(columnName).getValue(row);
-					params.append("<").append(columnName).append(">").append(columnValue).append("</").append(columnName).append(">\r\n");
+					currColumnProcessed = columnName;
+					currCol = a;
+					Object columnValue = getColumnManager().getColumnByName(columnName).getValue(row);
+					String columnValueStr = columnValue==null?"":columnValue.toString();
+					params.append("<").append(columnName).append(">").append(columnValueStr).append("</").append(columnName).append(">\r\n");
 				}			
-				params.append("<Category/>\r\n" + 
-						"<InstToTopCat>0</InstToTopCat>\r\n" + 
-						"<Mob>0</Mob>\r\n" + 
-						"<RiskCategory/>\r\n" + 
-						"<Score>0</Score>\r\n" + 
-						"<Treatment/>\r\n"); 	
 				params.append("</RESULTS>\r\n");
 				
 				//Construct end tag
@@ -129,10 +165,10 @@ public class DecisionScore extends StepConfiguration{
 				params.append("</soap:body>\r\n");
 				params.append("</soap:envelope>");
 			} catch (Exception e) {
-				logError(e.getMessage());
+				logError(e.getMessage() + " - Current Column Processed : " + currColumnProcessed + " - col : " + currCol);
 			}
 			
-			log("string constructed: "+params.toString());
+			//log("string constructed: "+params.toString());
 			return params.toString();
 		}
 
@@ -174,6 +210,40 @@ public class DecisionScore extends StepConfiguration{
 			sendProgress(progress);
 			return rowCount;
 		}	
+		
+		private String getScoreFromResponseMessages (String messages) {
+			try {  
+				DocumentBuilderFactory fctr = DocumentBuilderFactory.newInstance();
+				DocumentBuilder bldr = fctr.newDocumentBuilder();
+				InputSource insrc = new InputSource(new StringReader(messages));
+				Document document = bldr.parse(insrc);
+				NodeList nodeList = document.getElementsByTagName("RESULTS");
+				for (int i = 0; i < nodeList.getLength(); i++) {
+					Node node = nodeList.item(i);
+					if (node.getNodeType() == Node.ELEMENT_NODE) {
+						// do something with the current element
+						//System.out.println(node.getNodeName());
+						NodeList nodeList2 = node.getChildNodes();
+						for (int j = 0; j < nodeList2.getLength(); j++) {
+							//System.out.println(nodeList2.item(j).getNodeName());
+
+							Element resultEl = null;
+							if(nodeList2.item(j).getNodeType() == Node.ELEMENT_NODE)
+								resultEl = (Element) nodeList2.item(j);
+							
+							if (resultEl != null && resultEl.getNodeName().equals("Score")) {
+//								System.out.println("Ketemu Score dengan value : " + resultEl.getTextContent());
+								return resultEl.getTextContent();
+							}
+						}
+					}
+				}
+			} catch (Exception e) {  
+				e.printStackTrace();  
+			} 
+			
+			return "Error";
+		}
 
 		private DecisionResponse performScoring(String rowId) {
 			HttpURLConnection con;
@@ -195,7 +265,7 @@ public class DecisionScore extends StepConfiguration{
 				wr.flush();
 				wr.close();
 
-				int responseCode = con.getResponseCode();
+				//int responseCode = con.getResponseCode();
 
 				BufferedReader in = new BufferedReader(
 						new InputStreamReader(con.getInputStream()));
@@ -207,124 +277,9 @@ public class DecisionScore extends StepConfiguration{
 				}
 				in.close();
 				
-				log("Response : " + responseCode + " - message : " + response.toString());
-				return new DecisionResponse(String.valueOf(rowId), String.valueOf("TEST"));
-			}
-			catch (IOException ex){
-				ex.printStackTrace();
-
-			}
-			catch (Exception ex) {
-				ex.printStackTrace();
-			}
-
-			return new DecisionResponse(String.valueOf(rowId), String.valueOf("Unknown"));
-		}
-
-		/**
-		 * Implement your call into your slow Rest (or other) API here.
-		 * It will be called concurrently THREAD_SIZE times in order to improve performance.
-		 * It currently obtains and returns a composite object that can be customised or changed as required.
-		 * @param textString
-		 * @return String
-		 */
-		private DecisionResponse performScoring(String rowId, String parameter) {
-			HttpURLConnection con;
-			URL obj;
-
-			try {
-				String urlStr = "http://localhost:8092/DAService";
-				obj = new URL(urlStr);
-				con = (HttpURLConnection) obj.openConnection();
-
-				String urlBody = "<soap:envelope xmlns:soap=\"http://www.w3.org/2003/05/soap-envelope\" xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n" + 
-						"<soap:body>\r\n" + 
-						"<DAXMLDocument xmlns:xsi=\"http://www.w3.org/2001/XMLSchema-instance\">\r\n" + 
-						"<OCONTROL>\r\n" + 
-						"<ALIAS>COLE2E</ALIAS>\r\n" + 
-						"<SIGNATURE>EXPN</SIGNATURE>\r\n" + 
-						"<APPLICATION_ID>111111</APPLICATION_ID>\r\n" + 
-						"<DALOGLEVEL>0</DALOGLEVEL>\r\n" + 
-						"</OCONTROL>\r\n" + 
-						"<INPUT>\r\n" + 
-						"<Ba2flag/>\r\n" + 
-						"<Badacctflag/>\r\n" + 
-						"<Bussunit/>\r\n" + 
-						"<Ca>C0</Ca>\r\n" + 
-						"<Cam1>C0</Cam1>\r\n" + 
-						"<Cam2>C0</Cam2>\r\n" + 
-						"<Cam3>C0</Cam3>\r\n" + 
-						"<Contractno>0</Contractno>\r\n" + 
-						"<Currpalsts/>\r\n" + 
-						"<Cy>C0</Cy>\r\n" + 
-						"<Cym1>C0</Cym1>\r\n" + 
-						"<Cym2>C0</Cym2>\r\n" + 
-						"<Cym3>C0</Cym3>\r\n" + 
-						"<Grsdp>1000000</Grsdp>\r\n" + 
-						"<Instno>14</Instno>\r\n" + 
-						"<Isautowo>N</Isautowo>\r\n" + 
-						"<Ispelsus>0</Ispelsus>\r\n" + 
-						"<Jtp>5</Jtp>\r\n" + 
-						"<MobDate>2018-03-10</MobDate>\r\n" + 
-						"<Monthinst>1235000</Monthinst>\r\n" + 
-						"<Netdp>0</Netdp>\r\n" + 
-						"<Objprice>20000000</Objprice>\r\n" + 
-						"<Officecode>0</Officecode>\r\n" + 
-						"<Pb>L5</Pb>\r\n" + 
-						"<Pbm1>L5</Pbm1>\r\n" + 
-						"<Pbm2>L5</Pbm2>\r\n" + 
-						"<Pbm3>L5</Pbm3>\r\n" + 
-						"<Periode>0</Periode>\r\n" + 
-						"<Principal>20005000</Principal>\r\n" + 
-						"<Prncots>16122976</Prncots>\r\n" + 
-						"<Rotype/>\r\n" + 
-						"<Sip/>\r\n" + 
-						"<Sipgrade>BRONZE</Sipgrade>\r\n" + 
-						"<St>AC</St>\r\n" + 
-						"<Tgglbyrm1>27</Tgglbyrm1>\r\n" + 
-						"<Tgglbyrm2>28</Tgglbyrm2>\r\n" + 
-						"<Tgglbyrm3>28</Tgglbyrm3>\r\n" + 
-						"<Top>24</Top>\r\n" + 
-						"<Tt1>PIM</Tt1>\r\n" + 
-						"<Tt2>RC</Tt2>\r\n" + 
-						"<Tt3>RC</Tt3>\r\n" + 
-						"</INPUT>\r\n" + 
-						"<RESULTS>\r\n" + 
-						"<Category/>\r\n" + 
-						"<InstToTopCat>0</InstToTopCat>\r\n" + 
-						"<Mob>0</Mob>\r\n" + 
-						"<RiskCategory/>\r\n" + 
-						"<Score>0</Score>\r\n" + 
-						"<Treatment/>\r\n" + 
-						"</RESULTS>\r\n" + 
-						"</DAXMLDocument>\r\n" + 
-						"</soap:body>\r\n" + 
-						"</soap:envelope>";
-
-				con.setRequestMethod("POST");
-				con.setRequestProperty("Content-Type", "application/xml");
-				con.setDoOutput(true);
-
-				DataOutputStream wr = new DataOutputStream(con.getOutputStream());
-				wr.writeBytes(urlBody);
-				wr.flush();
-				wr.close();
-
-				int responseCode = con.getResponseCode();
-
-				BufferedReader in = new BufferedReader(
-						new InputStreamReader(con.getInputStream()));
-				String inputLine;
-				StringBuffer response = new StringBuffer();
-
-				while ((inputLine = in.readLine()) != null) {
-					response.append(inputLine);
-				}
-				in.close();
-
-				//print result
-
-				return new DecisionResponse(String.valueOf(rowId), String.valueOf("TEST"));
+				//log("Response : " + responseCode + " - message : " + response.toString());
+				String responseScore = getScoreFromResponseMessages(response.toString());
+				return new DecisionResponse(String.valueOf(rowId), responseScore);
 			}
 			catch (IOException ex){
 				ex.printStackTrace();

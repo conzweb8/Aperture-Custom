@@ -37,7 +37,7 @@ import com.experian.datatype.DateAndTime;
 
 
 public class DecisionScore extends StepConfiguration{
-	public static String VERSION = "0.1.4";
+	public static String VERSION = "0.1.5";
 	//TODO: Create Cache
 	//TODO: More optimize processing... 
 	public DecisionScore() {
@@ -47,15 +47,63 @@ public class DecisionScore extends StepConfiguration{
 		setStepDefinitionIcon("ROWS");
 
 		StepProperty arg1 = new StepProperty()
-				.ofType(StepPropertyType.COLUMN_CHOOSER)
+				.ofType(StepPropertyType.INTEGER)
 				.withStatusIndicator(sp -> () -> sp.allowedValuesProvider != null)
 				.withIconTypeSupplier(sp -> () -> sp.getValue() == null ? "ERROR" : "OK")
-				.withArgTextSupplier(sp -> () -> sp.allowedValuesProvider == null ? "Connect an input" : (sp.getValue() == null ? "<Select text column>" : sp.getValue().toString()))
+				.withArgTextSupplier(sp -> () -> {
+                    if (sp.getValue() == null || sp.getValue().toString().isEmpty()) {
+                        return "Enter end header column";
+                    } else {
+                        try {
+                            return "End header column: " + Integer.parseInt(sp.getValue().toString());
+                        } catch (NumberFormatException ex) {
+                            return "End header column: 0";
+                        }
+                    }
+                })
 				.havingInputNode(() -> "input0")
 				.havingOutputNode(() -> "output0")
 				.validateAndReturn();
-
-		setStepProperties(Arrays.asList(arg1));
+		
+		StepProperty arg2 = new StepProperty()
+				.ofType(StepPropertyType.INTEGER)
+				.withStatusIndicator(sp -> () -> sp.allowedValuesProvider != null)
+				.withIconTypeSupplier(sp -> () -> sp.getValue() == null ? "ERROR" : "OK")
+				.withArgTextSupplier(sp -> () -> {
+                    if (sp.getValue() == null || sp.getValue().toString().isEmpty()) {
+                        return "Enter start body column";
+                    } else {
+                        try {
+                            return "Start body column: " + Integer.parseInt(sp.getValue().toString());
+                        } catch (NumberFormatException ex) {
+                            return "Start body column: 0";
+                        }
+                    }
+                })
+				.havingInputNode(() -> "input0")
+				.havingOutputNode(() -> "output0")
+				.validateAndReturn();
+		
+		StepProperty arg3 = new StepProperty()
+				.ofType(StepPropertyType.INTEGER)
+				.withStatusIndicator(sp -> () -> sp.allowedValuesProvider != null)
+				.withIconTypeSupplier(sp -> () -> sp.getValue() == null ? "ERROR" : "OK")
+				.withArgTextSupplier(sp -> () -> {
+                    if (sp.getValue() == null || sp.getValue().toString().isEmpty()) {
+                        return "Enter end body column";
+                    } else {
+                        try {
+                            return "End body column: " + Integer.parseInt(sp.getValue().toString());
+                        } catch (NumberFormatException ex) {
+                            return "End body column: 0";
+                        }
+                    }
+                })
+				.havingInputNode(() -> "input0")
+				.havingOutputNode(() -> "output0")
+				.validateAndReturn();		
+		
+		setStepProperties(Arrays.asList(arg1, arg2, arg3));
 
 		setStepOutput(new MyStepOutput());	
 	}
@@ -65,8 +113,11 @@ public class DecisionScore extends StepConfiguration{
 		List<StepProperty> properties = getStepProperties();
 		if (properties != null && !properties.isEmpty()) {
 			StepProperty arg1 = properties.get(0);
-			if (arg1 != null && arg1.getValue() != null) {
-				return null;
+			StepProperty arg2 = properties.get(1);
+			StepProperty arg3 = properties.get(2);
+			
+			if (arg1 != null && arg1.getValue() != null && arg2 != null && arg2.getValue() != null  && arg3 != null && arg3.getValue() != null) {
+				return true;
 			}
 		}
 		return false;
@@ -75,6 +126,7 @@ public class DecisionScore extends StepConfiguration{
 	private class MyStepOutput extends StepOutput {
 		static final int BLOCK_SIZE = 1000;
 		static final int THREAD_SIZE = 24;
+		
 
 		Map<String, DecisionResponse> object_response = new HashMap<String, DecisionResponse>();
 
@@ -85,6 +137,12 @@ public class DecisionScore extends StepConfiguration{
 
 		@Override
 		public void initialise() throws SDKException {
+			
+			int headercolno = Integer.parseInt(getArgument(0).toString());
+            int bodycolno = Integer.parseInt(getArgument(2).toString());
+            int startbodycolno = Integer.parseInt(getArgument(1).toString());
+            log("Initialize header end col : " + headercolno + " Start body col " + startbodycolno + " body end col " + bodycolno);
+            
 			// clear columns so they are not saved, resulting in undefined columns
 			getColumnManager().clearColumns();
 			// initialise the columns with the first input's columns
@@ -125,7 +183,6 @@ public class DecisionScore extends StepConfiguration{
 					currCol = a;
 					String columnValueStr = "";
 					Object columnValue = getColumnManager().getColumnByName(columnName).getValue(row);
-					
 					
 					if (columnValue != null && columnValue instanceof DateAndTime) {
 						//If date format

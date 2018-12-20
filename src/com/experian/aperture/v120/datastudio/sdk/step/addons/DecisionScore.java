@@ -1,4 +1,4 @@
-package com.experian.aperture.datastudio.sdk.step.addons;
+package com.experian.aperture.v120.datastudio.sdk.step.addons;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
@@ -25,8 +25,6 @@ import java.util.regex.Pattern;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
-import org.jfree.util.Log;
-import org.python.core.exceptions;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
@@ -39,6 +37,7 @@ import com.experian.aperture.datastudio.sdk.step.StepOutput;
 import com.experian.aperture.datastudio.sdk.step.StepProperty;
 import com.experian.aperture.datastudio.sdk.step.StepPropertyType;
 import com.experian.datatype.DateAndTime;
+
 
 
 public class DecisionScore extends StepConfiguration{
@@ -314,7 +313,7 @@ public class DecisionScore extends StepConfiguration{
 					}
 				}
 			} catch (Exception e) {  
-				Log.error("Error happened when return result : " + e.getMessage());
+				log("Error happened when return result : " + e.getMessage());
 				log("Return messages : " + ret_msg);
 				e.printStackTrace();  
 			} 
@@ -367,10 +366,10 @@ public class DecisionScore extends StepConfiguration{
 				return new DecisionResponse(String.valueOf(rowId), responseScore);
 			}
 			catch (IOException ex){
-				Log.error("Error while sending messages " + ex.getMessage());
+				log("Error while sending messages " + ex.getMessage());
 			}
 			catch (Exception ex) {
-				Log.error("Error while getting response messages " + ex.getMessage());
+				log("Error while getting response messages " + ex.getMessage());
 			}
 
 			return new DecisionResponse(String.valueOf(rowId), String.valueOf("Unknown"));

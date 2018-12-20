@@ -7,10 +7,13 @@
 	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/icu4j-localespi-49_1.jar"/>
 	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/fontbox-2.0.11.jar"/>
 	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/pdfbox-2.0.11.jar"/>
-	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/sdk-1.1.5.jar"/>
-	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/http-core-4.1.jar"/>
 	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/java-json.jar"/>
-	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/org-apache-commons-logging.jar"/>
-	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/apache-commons-httpclient.jar"/>
+	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/sdk-1.3.0.jar"/>
+	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/wsdl4j.jar"/>
+	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/pserver.jar"/>
+	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/sdksteps-1.3.0.jar"/>
+	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/sdk.jar"/>
+	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/httpclient-4.5.3.jar"/>
+	<classpathentry kind="lib" path="/Users/constantin/Project/Java Workspace/Aperture Custom/lib/httpcore-4.4.6.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>
